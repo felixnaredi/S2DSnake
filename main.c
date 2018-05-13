@@ -72,10 +72,22 @@ void Squares_draw(Square* square) {
 	int x = square->pos.x;
 	int y = square->pos.y;
 
-	S2D_DrawQuad(x, y, 0.3, 0.8, 0, 1,
-		x + TILE_SIZE, y, 0.3, 0.8, 0, 1,
-		x + TILE_SIZE, y + TILE_SIZE, 0.3, 0.8, 0, 1,
-		x, y + TILE_SIZE, 0.3, 0.8, 0, 1);
+	S2D_DrawQuad(x, y, 0.9, 0.6, 0.3, 1,
+		x + TILE_SIZE, y, 0.9, 0.6, 0.3, 1,
+		x + TILE_SIZE, y + TILE_SIZE, 0.9, 0.6, 0.3, 1,
+		x, y + TILE_SIZE, 0.9, 0.6, 0.3, 1);
+
+}
+
+void Foods_draw(Food* food) {
+
+	int x = food->pos.x;
+	int y = food->pos.y;
+
+	S2D_DrawQuad(x, y, 1, 1, 1, 1,
+		x + FOOD_SIZE, y, 1, 1, 1, 1,
+		x + FOOD_SIZE, y + FOOD_SIZE, 1, 1, 1, 1,
+		x, y + FOOD_SIZE, 1, 1, 1, 1);
 
 }
 
@@ -88,6 +100,61 @@ Point nextPos(Point dir, Point pos) {
 
 }
 
+void updateTiles(Point pos, Point nextP) {
+
+	tiles[nextP.x / TILE_SIZE][nextP.y / TILE_SIZE] = 1;
+	tiles[pos.x / TILE_SIZE][pos.y / TILE_SIZE] = 0;
+
+}
+
+void updateBody(Square* body) {
+
+	updateTiles(body[0].pos, head.headPart.lastPos);
+	body[0].pos = head.headPart.lastPos;
+
+	for (int i = 0; i < head.bodyLength - 1; i++) {
+		updateTiles(body[i + 1].pos, body[i].lastPos);
+		body[i + 1].pos = body[i].lastPos;
+		body[i].lastPos = body[i].pos;
+	}
+	body[head.bodyLength - 1].lastPos = body[head.bodyLength - 1].pos;
+	tiles[body[head.bodyLength - 1].lastPos.x / TILE_SIZE][body[head.bodyLength - 1].lastPos.y / TILE_SIZE] = 1;
+
+}
+
+void addPartToBody() {
+
+	if (head.bodyLength == MAX_BODY_LENGTH)
+		return;
+
+	Square* b = head.body;
+	int newX = b[head.bodyLength - 1].pos.x;
+	int newY = b[head.bodyLength - 1].pos.y;
+	b[head.bodyLength] = (Square) { newX, newY, newX, newY, Squares_draw };
+
+	tiles[newX / TILE_SIZE][newY / TILE_SIZE] = 1;
+	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
+
+	Point emptyPoints[nTiles];
+	int index = 0;
+	for (int i = 0; i < N_COLUMNS; i++) {
+		for (int j = 0; j < N_ROWS; j++) {
+			if (!tiles[i][j]) {
+				emptyPoints[index] = (Point) { i * TILE_SIZE, j * TILE_SIZE };
+				index += 1;
+			}
+		}
+	}
+
+	int randIndex = rand() % index;
+	food.pos = (Point) { emptyPoints[randIndex].x, emptyPoints[randIndex].y };
+	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
+
+	head.bodyLength += 1;
+	if (snake_speed > 8)
+		snake_speed -= 0.3;
+}
+
 void head_move(Head* head, S2D_Event* e) {
 
 	if (buffer >= snake_speed || e) {
@@ -95,7 +162,7 @@ void head_move(Head* head, S2D_Event* e) {
 		Point pos = head->headPart.pos;
 		Point nextP = nextPos(dir, pos);
 
-		
+
 		if (nextP.x < 0 || nextP.x > WINDOW_WIDTH - TILE_SIZE)
 			return;
 		if (nextP.y < 0 || nextP.y > WINDOW_HEIGHT - TILE_SIZE)
@@ -123,73 +190,7 @@ void head_move(Head* head, S2D_Event* e) {
 	}
 	buffer += 1;
 }
-
-void updateBody(Square* body) {
-
-	updateTiles(body[0].pos, head.headPart.lastPos);
-	body[0].pos = head.headPart.lastPos;
-
-	for (int i = 0; i < head.bodyLength - 1; i++) {
-		updateTiles(body[i + 1].pos, body[i].lastPos);  
-		body[i + 1].pos = body[i].lastPos;
-		body[i].lastPos = body[i].pos;
-	}
-	body[head.bodyLength - 1].lastPos = body[head.bodyLength - 1].pos;
-
-}
-
-void addPartToBody() {
-
-	if (head.bodyLength == MAX_BODY_LENGTH)
-		return;
-
-	Square* b = head.body;
-	int newX = b[head.bodyLength - 1].pos.x;
-	int newY = b[head.bodyLength - 1].pos.y;
-	b[head.bodyLength] = (Square){ newX, newY, newX, newY, Squares_draw };
-
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 0;
-	/*
-	Point* emptyPoints = calloc(nTiles, sizeof(Point));
-	int nEmptyPoints = 0;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		for (int j = 0; j < N_ROWS; j++) {
-			if (!tiles[i][j]) {
-				emptyPoints[i * N_COLUMNS + j] = (Point) { i * TILE_SIZE, j * TILE_SIZE };
-				nEmptyPoints += 1;
-			}
-		}
-	} */
-
-	food.pos = (Point) {TILE_SIZE * (rand() % (WINDOW_WIDTH / TILE_SIZE)), TILE_SIZE * (rand() % (WINDOW_HEIGHT / TILE_SIZE))};
-	//food.pos = (Point) {emptyPoints[rand() % nEmptyPoints].x,  emptyPoints[rand() % nEmptyPoints].y};
-	//free(emptyPoints);
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
-
-	head.bodyLength += 1;
-	if(snake_speed > 8 )
-		snake_speed -= 0.3;
-}
-
-void updateTiles(Point pos, Point nextP) {
-
-	tiles[nextP.x / TILE_SIZE][nextP.y / TILE_SIZE] = 1;
-	tiles[pos.x / TILE_SIZE][pos.y / TILE_SIZE] = 0;
-
-}
-
-void Foods_draw(Food* food) {
-
-	int x = food->pos.x;
-	int y = food->pos.y;
-
-	S2D_DrawQuad(x, y, 30, 144, 255, 1,
-		x + FOOD_SIZE, y, 30, 144, 255, 1,
-		x + FOOD_SIZE, y + FOOD_SIZE, 30, 144, 255, 1,
-		x, y + FOOD_SIZE, 30, 144, 255, 1);
-
-}
-
+//------------------------------------------------------------------------------------
 void debug_draw(Square square) {
 
 	int x = square.pos.x;
@@ -200,11 +201,28 @@ void debug_draw(Square square) {
 		x + FOOD_SIZE, y + FOOD_SIZE, 0.7, 0, 0, 1,
 		x, y + FOOD_SIZE, 0.7, 0, 0, 1);
 
-} 
+}
 
 //---------------------------------------------------------------Core Functions
 
 void render() {
+
+	float alpha = 0.4;
+	for (int i = 0; i < N_COLUMNS; i++) {
+		for (int j = 0; j < N_ROWS; j++) {
+
+			if ((i + j) % 2)
+				alpha = 0.36;
+
+			S2D_DrawQuad(i * TILE_SIZE, j * TILE_SIZE, 0.2, 0.5, 0.7, alpha,
+				i * TILE_SIZE + TILE_SIZE, j * TILE_SIZE, 0.2, 0.5, 0.7, alpha,
+				i * TILE_SIZE + TILE_SIZE, j * TILE_SIZE + TILE_SIZE, 0.2, 0.5, 0.7, alpha,
+				i * TILE_SIZE, j * TILE_SIZE + TILE_SIZE, 0.2, 0.5, 0.7, alpha);
+
+			alpha = 0.4;
+		}
+	}
+	//--------------------------------------------------------------------------------
 
 	head.headPart.draw(&head.headPart);
 	Square* body = head.body;
@@ -233,7 +251,7 @@ void update() {
 void on_key(S2D_Event e) {
 
 	if (e.type == S2D_KEY_DOWN) {
-		if (strcmp(e.key, "A") == 0) {
+		if (!strcmp(e.key, "A")) {
 
 			if (head.dir.x == -1)
 				return;
@@ -241,7 +259,7 @@ void on_key(S2D_Event e) {
 			head.move(&head, &e);
 
 		}
-		else if (strcmp(e.key, "S") == 0) {
+		else if (!strcmp(e.key, "S")) {
 
 			if (head.dir.y == 1)
 				return;
@@ -249,7 +267,7 @@ void on_key(S2D_Event e) {
 			head.move(&head, &e);
 
 		}
-		else if (strcmp(e.key, "W") == 0) {
+		else if (!strcmp(e.key, "W")) {
 
 			if (head.dir.y == -1)
 				return;
@@ -257,7 +275,7 @@ void on_key(S2D_Event e) {
 			head.move(&head, &e);
 
 		}
-		else if (strcmp(e.key, "D") == 0) {
+		else if (!strcmp(e.key, "D")) {
 
 			if (head.dir.x == 1)
 				return;
@@ -269,12 +287,9 @@ void on_key(S2D_Event e) {
 
 }
 
-//#ifdef _WIN32
-//int WinMain(int argc, char **argv) {
-//#else
-int main(int argc, char **argv) {
-//#endif
-	tiles = (int**) calloc(N_COLUMNS, sizeof(int*)); 
+void init() {
+
+	tiles = (int**)calloc(N_COLUMNS, sizeof(int*));
 	for (int i = 0; i < N_COLUMNS; i++) {
 		tiles[i] = (int*)calloc(N_ROWS, sizeof(int));
 	}
@@ -283,7 +298,17 @@ int main(int argc, char **argv) {
 	srand((unsigned int)time(NULL)); // do this only once
 
 	body[0] = (Square) { TILE_SIZE * 3, 0, TILE_SIZE * 3, 0, Squares_draw };
-	body[1] = (Square) { TILE_SIZE * 2, 0, 0, 0, Squares_draw };
+	body[1] = (Square) { TILE_SIZE * 2, 0, TILE_SIZE * 2, 0, Squares_draw };
+	tiles[2][0] = 1; // body[1]
+	tiles[3][0] = 1; // body[0]
+	tiles[4][0] = 1; // head
+
+}
+
+int WinMain(int argc, char **argv) {
+//int main(int argc, char **argv) {
+
+	init();
 
 	S2D_Window *window = S2D_CreateWindow(
 		"SimpleSnake", WINDOW_WIDTH, WINDOW_HEIGHT, update, render, 0
