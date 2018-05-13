@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define TILE_SIZE 16
+#define TILE_SIZE 32
 #define FOOD_SIZE TILE_SIZE
 #define N_ROWS 18
 #define N_COLUMNS 20 
@@ -50,7 +50,7 @@ void addPartToBody();
 Square body[MAX_BODY_LENGTH];
 int** tiles;
 int buffer = 0;
-float snake_speed = 18;
+float snake_speed = 15;
 
 Head head = {
 	1, 0,
@@ -107,7 +107,7 @@ void head_move(Head* head, S2D_Event* e) {
 				addPartToBody();
 			}
 			else {
-				// gameover
+				//game over
 				return;
 			}
 		}
@@ -149,12 +149,26 @@ void addPartToBody() {
 	b[head.bodyLength] = (Square){ newX, newY, newX, newY, Squares_draw };
 
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 0;
+	/*
+	Point* emptyPoints = calloc(nTiles, sizeof(Point));
+	int nEmptyPoints = 0;
+	for (int i = 0; i < N_COLUMNS; i++) {
+		for (int j = 0; j < N_ROWS; j++) {
+			if (!tiles[i][j]) {
+				emptyPoints[i * N_COLUMNS + j] = (Point) { i * TILE_SIZE, j * TILE_SIZE };
+				nEmptyPoints += 1;
+			}
+		}
+	} */
+
 	food.pos = (Point) {TILE_SIZE * (rand() % (WINDOW_WIDTH / TILE_SIZE)), TILE_SIZE * (rand() % (WINDOW_HEIGHT / TILE_SIZE))};
+	//food.pos = (Point) {emptyPoints[rand() % nEmptyPoints].x,  emptyPoints[rand() % nEmptyPoints].y};
+	//free(emptyPoints);
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
 
 	head.bodyLength += 1;
 	if(snake_speed > 8 )
-		snake_speed -= 0.4;
+		snake_speed -= 0.3;
 }
 
 void updateTiles(Point pos, Point nextP) {
@@ -175,7 +189,7 @@ void Foods_draw(Food* food) {
 		x, y + FOOD_SIZE, 30, 144, 255, 1);
 
 }
-/*
+
 void debug_draw(Square square) {
 
 	int x = square.pos.x;
@@ -186,7 +200,7 @@ void debug_draw(Square square) {
 		x + FOOD_SIZE, y + FOOD_SIZE, 0.7, 0, 0, 1,
 		x, y + FOOD_SIZE, 0.7, 0, 0, 1);
 
-} */
+} 
 
 //---------------------------------------------------------------Core Functions
 
@@ -255,11 +269,11 @@ void on_key(S2D_Event e) {
 
 }
 
-#ifdef _WIN32
-int WinMain(int argc, char **argv) {
-#else
+//#ifdef _WIN32
+//int WinMain(int argc, char **argv) {
+//#else
 int main(int argc, char **argv) {
-#endif
+//#endif
 	tiles = (int**) calloc(N_COLUMNS, sizeof(int*)); 
 	for (int i = 0; i < N_COLUMNS; i++) {
 		tiles[i] = (int*)calloc(N_ROWS, sizeof(int));
