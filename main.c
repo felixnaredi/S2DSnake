@@ -20,7 +20,7 @@ typedef struct Points {
 
 typedef struct Squares {
 	Point pos;
-	Point nextPos;
+	Point* nextPos;
 	void(*draw) (struct Squares*);
 
 }Square;
@@ -52,9 +52,11 @@ int** tiles;
 int buffer = 0;
 float snake_speed = 15;
 
+Point headNext = {0, 0};
+
 Head head = {
 	1, 0,
-	{ 4 * TILE_SIZE, 0, 0, 0, Squares_draw },
+	{ 4 * TILE_SIZE, 0, &headNext, Squares_draw },
 	body,
 	2,
 	head_move
@@ -109,14 +111,14 @@ void updateTiles(Point pos, Point nextP) {
 
 void updateBody(Square* body) {
 
-	body[0].nextPos = head.headPart.pos;
-
+	//body[0].nextPos = head.headPart.pos;
+	/*
 	for (int i = 1; i < head.bodyLength; i++) {
 		body[i].nextPos = body[i - 1].pos;
-	}
-	for (int i = 0; i < head.bodyLength; i++) {
-		updateTiles(body[i].pos, body[i].nextPos);
-		body[i].pos = body[i].nextPos;
+	} */
+	for (int i = head.bodyLength - 1; i >= 0; i--) {
+		updateTiles(body[i].pos, *body[i].nextPos);
+		body[i].pos = *body[i].nextPos;
 	}
 
 }
@@ -148,7 +150,7 @@ void addPartToBody() {
 	Square* b = head.body;
 	int newX = b[head.bodyLength - 1].pos.x;
 	int newY = b[head.bodyLength - 1].pos.y;
-	b[head.bodyLength] = (Square) { newX, newY, b[head.bodyLength - 1].pos, Squares_draw };
+	b[head.bodyLength] = (Square) { newX, newY, &b[head.bodyLength - 1].pos, Squares_draw };
 
 	tiles[newX / TILE_SIZE][newY / TILE_SIZE] = 1; //?
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1; //?
@@ -182,10 +184,11 @@ void head_move(Head* head, S2D_Event* e) {
 				return;
 			}
 		}
-		head->headPart.nextPos = nextP;
+		headNext = nextP;
+		//head->headPart.nextPos = nextP;
 		updateTiles(pos, nextP);
 		updateBody(head->body); // move the body
-		head->headPart.pos = head->headPart.nextPos; // move head
+		head->headPart.pos = *head->headPart.nextPos; // move head
 
 		buffer = 0;
 		return;
@@ -299,8 +302,8 @@ void init() {
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
 	srand((unsigned int)time(NULL)); // do this only once
 
-	body[0] = (Square) { TILE_SIZE * 3, 0, head.headPart.pos, Squares_draw };
-	body[1] = (Square) { TILE_SIZE * 2, 0, body[0].pos, Squares_draw };
+	body[0] = (Square) { TILE_SIZE * 3, 0, &head.headPart.pos, Squares_draw };
+	body[1] = (Square) { TILE_SIZE * 2, 0, &body[0].pos, Squares_draw };
 	tiles[2][0] = 1; // body[1]
 	tiles[3][0] = 1; // body[0]
 	tiles[4][0] = 1; // head
