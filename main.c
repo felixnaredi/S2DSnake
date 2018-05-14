@@ -10,7 +10,7 @@
 #define WINDOW_WIDTH TILE_SIZE * N_COLUMNS
 #define WINDOW_HEIGHT TILE_SIZE * N_ROWS
 #define nTiles (WINDOW_WIDTH * WINDOW_HEIGHT / (TILE_SIZE * TILE_SIZE))
-#define MAX_BODY_LENGTH 30
+#define MAX_BODY_LENGTH nTiles / 2
 
 
 //--------------------------------------------------------Structs
@@ -20,7 +20,7 @@ typedef struct Points {
 
 typedef struct Squares {
 	Point pos;
-	Point lastPos;
+	Point nextPos;
 	void(*draw) (struct Squares*);
 
 }Square;
@@ -54,7 +54,7 @@ float snake_speed = 15;
 
 Head head = {
 	1, 0,
-	{ 4 * TILE_SIZE, 0, 4 * TILE_SIZE, 0, Squares_draw },
+	{ 4 * TILE_SIZE, 0, 0, 0, Squares_draw },
 	body,
 	2,
 	head_move
@@ -109,31 +109,19 @@ void updateTiles(Point pos, Point nextP) {
 
 void updateBody(Square* body) {
 
-	updateTiles(body[0].pos, head.headPart.lastPos);
-	body[0].pos = head.headPart.lastPos;
+	body[0].nextPos = head.headPart.pos;
 
-	for (int i = 0; i < head.bodyLength - 1; i++) {
-		updateTiles(body[i + 1].pos, body[i].lastPos);
-		body[i + 1].pos = body[i].lastPos;
-		body[i].lastPos = body[i].pos;
+	for (int i = 1; i < head.bodyLength; i++) {
+		body[i].nextPos = body[i - 1].pos;
 	}
-	body[head.bodyLength - 1].lastPos = body[head.bodyLength - 1].pos;
-	tiles[body[head.bodyLength - 1].lastPos.x / TILE_SIZE][body[head.bodyLength - 1].lastPos.y / TILE_SIZE] = 1;
+	for (int i = 0; i < head.bodyLength; i++) {
+		updateTiles(body[i].pos, body[i].nextPos);
+		body[i].pos = body[i].nextPos;
+	}
 
 }
 
-void addPartToBody() {
-
-	if (head.bodyLength == MAX_BODY_LENGTH)
-		return;
-
-	Square* b = head.body;
-	int newX = b[head.bodyLength - 1].pos.x;
-	int newY = b[head.bodyLength - 1].pos.y;
-	b[head.bodyLength] = (Square) { newX, newY, newX, newY, Squares_draw };
-
-	tiles[newX / TILE_SIZE][newY / TILE_SIZE] = 1;
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
+void moveFood() {
 
 	Point emptyPoints[nTiles];
 	int index = 0;
@@ -150,9 +138,23 @@ void addPartToBody() {
 	food.pos = (Point) { emptyPoints[randIndex].x, emptyPoints[randIndex].y };
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
 
+}
+
+void addPartToBody() {
+
+	if (head.bodyLength == MAX_BODY_LENGTH)
+		return;
+
+	Square* b = head.body;
+	int newX = b[head.bodyLength - 1].pos.x;
+	int newY = b[head.bodyLength - 1].pos.y;
+	b[head.bodyLength] = (Square) { newX, newY, b[head.bodyLength - 1].pos, Squares_draw };
+
+	tiles[newX / TILE_SIZE][newY / TILE_SIZE] = 1; //?
+	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1; //?
+
 	head.bodyLength += 1;
-	if (snake_speed > 8)
-		snake_speed -= 0.3;
+
 }
 
 void head_move(Head* head, S2D_Event* e) {
@@ -172,18 +174,18 @@ void head_move(Head* head, S2D_Event* e) {
 
 			if (nextP.x == food.pos.x && nextP.y == food.pos.y) { // if food on next tile
 				addPartToBody();
+				moveFood();
+				if (snake_speed > 5) snake_speed -= 0.4;
 			}
 			else {
 				//game over
 				return;
 			}
 		}
+		head->headPart.nextPos = nextP;
 		updateTiles(pos, nextP);
-
-		head->headPart.pos = nextP; // move head
-
-		updateBody(head->body); // move the rest
-		head->headPart.lastPos = head->headPart.pos;
+		updateBody(head->body); // move the body
+		head->headPart.pos = head->headPart.nextPos; // move head
 
 		buffer = 0;
 		return;
@@ -297,8 +299,8 @@ void init() {
 	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
 	srand((unsigned int)time(NULL)); // do this only once
 
-	body[0] = (Square) { TILE_SIZE * 3, 0, TILE_SIZE * 3, 0, Squares_draw };
-	body[1] = (Square) { TILE_SIZE * 2, 0, TILE_SIZE * 2, 0, Squares_draw };
+	body[0] = (Square) { TILE_SIZE * 3, 0, head.headPart.pos, Squares_draw };
+	body[1] = (Square) { TILE_SIZE * 2, 0, body[0].pos, Squares_draw };
 	tiles[2][0] = 1; // body[1]
 	tiles[3][0] = 1; // body[0]
 	tiles[4][0] = 1; // head
