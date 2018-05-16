@@ -4,313 +4,207 @@
 #include <stdlib.h>
 
 #define TILE_SIZE 32
-#define FOOD_SIZE TILE_SIZE
 #define N_ROWS 18
-#define N_COLUMNS 20 
-#define WINDOW_WIDTH TILE_SIZE * N_COLUMNS
-#define WINDOW_HEIGHT TILE_SIZE * N_ROWS
-#define nTiles (WINDOW_WIDTH * WINDOW_HEIGHT / (TILE_SIZE * TILE_SIZE))
-#define MAX_BODY_LENGTH nTiles / 2
+#define N_COLUMNS 20
+#define WINDOW_WIDTH (TILE_SIZE * N_COLUMNS)
+#define WINDOW_HEIGHT (TILE_SIZE * N_ROWS)
+#define MAX_BODY_LENGTH ((N_COLUMNS * N_ROWS) / 2)
+#define ORIG_MOVE_DURATION 15
+#define MIN_MOVE_DURATION 5
 
 
 //--------------------------------------------------------Structs
-typedef struct Points {
+typedef struct __type_Point {
 	int x, y;
-}Point;
+} Point;
 
-typedef struct Squares {
-	Point pos;
-	Point nextPos;
-	void(*draw) (struct Squares*);
-
-}Square;
-
-typedef struct tHead {
+typedef struct __type_Snake {
 	Point dir;
-	Square headPart;
-	Square* body;
+	Point head;
+	Point body[MAX_BODY_LENGTH];
 	int bodyLength;
-	void(*move) (struct tHead*, S2D_Event* e);
-}Head;
+} Snake;
 
-typedef struct Foods {
-	Point pos;
-	void(*draw) (struct Foods*);
-}Food;
+//------------------------------------------Function Declarations
 
-//------------------------------------------Predefined functions
-void Squares_draw(Square* square);
-void Foods_draw(Food* food);
-void head_move(Head* head, S2D_Event* e);
-void updateBody(Square* body);
-void updateTiles(Point pos, Point nextP);
-void addPartToBody();
+void drawSquare(Point pos, float r, float g, float b);
+void moveFood(const Snake* snake);
+Snake makeSnake(void);
+int moveSnake(Snake* snake);
+
 //---------------------------------------------------------------Static
 
-Square body[MAX_BODY_LENGTH];
-int** tiles;
 int buffer = 0;
-float snake_speed = 15;
-
-Head head = {
-	1, 0,
-	{ 4 * TILE_SIZE, 0, 0, 0, Squares_draw },
-	body,
-	2,
-	head_move
-};
-
-Food food = {
-	TILE_SIZE * 10, TILE_SIZE * 10,
-	Foods_draw
-};
+float move_duration = ORIG_MOVE_DURATION;
+Snake snake;
+Point food;
 
 //-----------------------------------------------------------Functions
 
-void Squares_draw(Square* square) {
-
-	int x = square->pos.x;
-	int y = square->pos.y;
-
-	S2D_DrawQuad(x, y, 0.9, 0.6, 0.3, 1,
-		x + TILE_SIZE, y, 0.9, 0.6, 0.3, 1,
-		x + TILE_SIZE, y + TILE_SIZE, 0.9, 0.6, 0.3, 1,
-		x, y + TILE_SIZE, 0.9, 0.6, 0.3, 1);
-
+Snake makeSnake() {
+	
+	return (Snake) {
+		.dir = {1, 0},
+		.head = {4, 0},
+		.body = {
+			{3, 0}, {2, 0},
+		}, 
+		.bodyLength = 2,
+	};
 }
 
-void Foods_draw(Food* food) {
-
-	int x = food->pos.x;
-	int y = food->pos.y;
-
-	S2D_DrawQuad(x, y, 1, 1, 1, 1,
-		x + FOOD_SIZE, y, 1, 1, 1, 1,
-		x + FOOD_SIZE, y + FOOD_SIZE, 1, 1, 1, 1,
-		x, y + FOOD_SIZE, 1, 1, 1, 1);
-
+void drawSquare(Point point, float r, float g, float b) {
+	
+	Point pixel = (Point) {point.x * TILE_SIZE, point.y * TILE_SIZE};
+	
+	S2D_DrawQuad(
+		pixel.x,             pixel.y,             r, g, b, 1,
+		pixel.x + TILE_SIZE, pixel.y,             r, g, b, 1,
+		pixel.x + TILE_SIZE, pixel.y + TILE_SIZE, r, g, b, 1,
+		pixel.x,             pixel.y + TILE_SIZE, r, g, b, 1
+	);
 }
 
-Point nextPos(Point dir, Point pos) {
+int snakeContainsPoint(const Snake* snake, Point point) {      
 
-	if (dir.x) {
-		return (Point) { pos.x + dir.x * TILE_SIZE, pos.y };
+	if(point.x == snake->head.x && point.y == snake->head.y)
+		return 1;
+	for(int i = 0; i < snake->bodyLength; i++) {
+		if(point.x == snake->body[i].x && point.y == snake->body[i].y)
+			return 1;
 	}
-	return (Point) { pos.x, pos.y + dir.y * TILE_SIZE };
-
+	return 0;
 }
 
-void updateTiles(Point pos, Point nextP) {
+void moveFood(const Snake* snake) {
 
-	tiles[nextP.x / TILE_SIZE][nextP.y / TILE_SIZE] = 1;
-	tiles[pos.x / TILE_SIZE][pos.y / TILE_SIZE] = 0;
-
-}
-
-void updateBody(Square* body) {
-
-	body[0].nextPos = head.headPart.pos;
-
-	for (int i = 1; i < head.bodyLength; i++) {
-		body[i].nextPos = body[i - 1].pos;
-	}
-	for (int i = 0; i < head.bodyLength; i++) {
-		updateTiles(body[i].pos, body[i].nextPos);
-		body[i].pos = body[i].nextPos;
-	}
-
-}
-
-void moveFood() {
-
-	Point emptyPoints[nTiles];
-	int index = 0;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		for (int j = 0; j < N_ROWS; j++) {
-			if (!tiles[i][j]) {
-				emptyPoints[index] = (Point) { i * TILE_SIZE, j * TILE_SIZE };
-				index += 1;
-			}
-		}
-	}
-
-	int randIndex = rand() % index;
-	food.pos = (Point) { emptyPoints[randIndex].x, emptyPoints[randIndex].y };
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
-
-}
-
-void addPartToBody() {
-
-	if (head.bodyLength == MAX_BODY_LENGTH)
+	while(1) {
+		Point point = {
+			.x = rand() % N_COLUMNS,
+			.y = rand() % N_ROWS,
+		};
+		if(snakeContainsPoint(snake, point))
+			continue;
+		food = point;
 		return;
-
-	Square* b = head.body;
-	int newX = b[head.bodyLength - 1].pos.x;
-	int newY = b[head.bodyLength - 1].pos.y;
-	b[head.bodyLength] = (Square) { newX, newY, b[head.bodyLength - 1].pos, Squares_draw };
-
-	tiles[newX / TILE_SIZE][newY / TILE_SIZE] = 1; //?
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1; //?
-
-	head.bodyLength += 1;
-
+	}		
 }
+ 
+int moveSnake(Snake* snake) {
+	
+	Point pos = snake->head;
+	Point dir = snake->dir;
+	Point next = (Point) {
+		.x = pos.x + dir.x,
+		.y = pos.y + dir.y,
+	};
+	Point *body = snake->body;
 
-void head_move(Head* head, S2D_Event* e) {
+	if(next.x < 0 || next.x >= N_COLUMNS ||
+	   next.y < 0 || next.y >= N_ROWS ||
+	   snakeContainsPoint(snake, next))
+		return 0;
 
-	if (buffer >= snake_speed || e) {
-		Point dir = head->dir;
-		Point pos = head->headPart.pos;
-		Point nextP = nextPos(dir, pos);
+	if(next.x == food.x && next.y == food.y) {
+		moveFood(snake);
+		if(ORIG_MOVE_DURATION > MIN_MOVE_DURATION)
+			move_duration -= 0.4;
+		if(snake->bodyLength < MAX_BODY_LENGTH)
+			snake->bodyLength++;
+	}	
 
+	for(int i = snake->bodyLength - 1; i > 0; i--)
+		body[i] = body[i - 1];
+	body[0] = snake->head;
+	snake->head = next;	
 
-		if (nextP.x < 0 || nextP.x > WINDOW_WIDTH - TILE_SIZE)
-			return;
-		if (nextP.y < 0 || nextP.y > WINDOW_HEIGHT - TILE_SIZE)
-			return;
-
-		if (tiles[nextP.x / TILE_SIZE][nextP.y / TILE_SIZE]) { // if next tile is occupied
-
-			if (nextP.x == food.pos.x && nextP.y == food.pos.y) { // if food on next tile
-				addPartToBody();
-				moveFood();
-				if (snake_speed > 5) snake_speed -= 0.4;
-			}
-			else {
-				//game over
-				return;
-			}
-		}
-		head->headPart.nextPos = nextP;
-		updateTiles(pos, nextP);
-		updateBody(head->body); // move the body
-		head->headPart.pos = head->headPart.nextPos; // move head
-
-		buffer = 0;
-		return;
-	}
-	buffer += 1;
-}
-//------------------------------------------------------------------------------------
-void debug_draw(Square square) {
-
-	int x = square.pos.x;
-	int y = square.pos.y;
-
-	S2D_DrawQuad(x, y, 0.7, 0, 0, 1,
-		x + FOOD_SIZE, y, 0.7, 0, 0, 1,
-		x + FOOD_SIZE, y + FOOD_SIZE, 0.7, 0, 0, 1,
-		x, y + FOOD_SIZE, 0.7, 0, 0, 1);
-
+	buffer = 0;
+	return 1;
 }
 
 //---------------------------------------------------------------Core Functions
 
-void render() {
+void render(void) {
 
-	float alpha = 0.4;
-	for (int i = 0; i < N_COLUMNS; i++) {
-		for (int j = 0; j < N_ROWS; j++) {
-
-			if ((i + j) % 2)
-				alpha = 0.36;
-
-			S2D_DrawQuad(i * TILE_SIZE, j * TILE_SIZE, 0.2, 0.5, 0.7, alpha,
-				i * TILE_SIZE + TILE_SIZE, j * TILE_SIZE, 0.2, 0.5, 0.7, alpha,
-				i * TILE_SIZE + TILE_SIZE, j * TILE_SIZE + TILE_SIZE, 0.2, 0.5, 0.7, alpha,
-				i * TILE_SIZE, j * TILE_SIZE + TILE_SIZE, 0.2, 0.5, 0.7, alpha);
-
-			alpha = 0.4;
-		}
+	for (int x = 0; x < N_COLUMNS; x++) {
+		for (int y = 0; y < N_ROWS; y++)			
+			drawSquare(
+				(Point) {x, y},
+				0.2,
+				0.3 + (x + y) % 2 * 0.1,
+				0.5
+			);
 	}
-	//--------------------------------------------------------------------------------
-
-	head.headPart.draw(&head.headPart);
-	Square* body = head.body;
-	for (int i = 0; i < head.bodyLength; i++) {
-		body[i].draw(&body[i]);
-	}
-	food.draw(&food);
-
-	//debug 
-	/*
-	for (int i = 0; i < N_COLUMNS; i++) {
-		for (int j = 0; j < N_ROWS; j++) {
-			if (tiles[i][j])
-				debug_draw((Square){ i * TILE_SIZE, j * TILE_SIZE, 0, 0, Squares_draw });
-		}
-	} */
-
+	
+	drawSquare(snake.head, 0.9, 0.6, 0.3);
+	for(int i = 0; i < snake.bodyLength; i++)
+		drawSquare(snake.body[i], 0.9, 0.6, 0.3);
+	
+	drawSquare(food, 1.0, 1.0, 1.0);
 }
 
-void update() {
+void update(void) {
 
-	head.move(&head, NULL);
+	if(buffer++ < move_duration)
+		return;
+	moveSnake(&snake);
+} 
 
+void resetGame(void) {
+	
+	move_duration = ORIG_MOVE_DURATION;
+	snake = makeSnake();
+	moveFood(&snake);
 }
 
 void on_key(S2D_Event e) {
 
-	if (e.type == S2D_KEY_DOWN) {
-		if (!strcmp(e.key, "A")) {
-
-			if (head.dir.x == -1)
-				return;
-			head.dir = (Point) {-1, 0};
-			head.move(&head, &e);
-
-		}
-		else if (!strcmp(e.key, "S")) {
-
-			if (head.dir.y == 1)
-				return;
-			head.dir = (Point) { 0, 1 };
-			head.move(&head, &e);
-
-		}
-		else if (!strcmp(e.key, "W")) {
-
-			if (head.dir.y == -1)
-				return;
-			head.dir = (Point) { 0, -1 };
-			head.move(&head, &e);
-
-		}
-		else if (!strcmp(e.key, "D")) {
-
-			if (head.dir.x == 1)
-				return;
-			head.dir = (Point) { 1, 0 };
-			head.move(&head, &e);
-
-		}
+	if(e.type != S2D_KEY_DOWN || strlen(e.key) > 1)
+		return;
+	
+	switch(e.key[0]) {
+	case 'W':
+		if(snake.dir.y)
+			return;
+		snake.dir = (Point){0, -1};
+		break;
+	case 'S':
+		if(snake.dir.y)
+			return;
+		snake.dir = (Point){0, 1};
+		break;
+	case 'A':
+		if(snake.dir.x)
+			return;
+		snake.dir = (Point){-1, 0};
+		break;
+	case 'D':
+		if(snake.dir.x)
+			return;
+		snake.dir = (Point){1, 0};
+		break;
+	case 'R':
+		resetGame();
+		break;
 	}
-
+	moveSnake(&snake);
 }
 
-void init() {
-
-	tiles = (int**)calloc(N_COLUMNS, sizeof(int*));
-	for (int i = 0; i < N_COLUMNS; i++) {
-		tiles[i] = (int*)calloc(N_ROWS, sizeof(int));
-	}
-
-	tiles[food.pos.x / TILE_SIZE][food.pos.y / TILE_SIZE] = 1;
+int init() {
 	srand((unsigned int)time(NULL)); // do this only once
+	resetGame();
 
-	body[0] = (Square) { TILE_SIZE * 3, 0, head.headPart.pos, Squares_draw };
-	body[1] = (Square) { TILE_SIZE * 2, 0, body[0].pos, Squares_draw };
-	tiles[2][0] = 1; // body[1]
-	tiles[3][0] = 1; // body[0]
-	tiles[4][0] = 1; // head
-
+	return 1;
 }
 
-int WinMain(int argc, char **argv) {
-//int main(int argc, char **argv) {
-
-	init();
+#ifdef WINDOWS
+int WinMain(int argc, char **argv)
+#else
+int main(int argc, char **argv)
+#endif
+{
+	if(!init())
+		return -1;
 
 	S2D_Window *window = S2D_CreateWindow(
 		"SimpleSnake", WINDOW_WIDTH, WINDOW_HEIGHT, update, render, 0
@@ -320,6 +214,6 @@ int WinMain(int argc, char **argv) {
 
 	S2D_Show(window);
 	S2D_FreeWindow(window);
-	free(tiles);
+
 	return 0;
 }
