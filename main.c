@@ -2,15 +2,17 @@
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define TILE_SIZE 32
-#define N_ROWS 18
-#define N_COLUMNS 20
+#define N_ROWS 12
+#define N_COLUMNS 24
 #define WINDOW_WIDTH (TILE_SIZE * N_COLUMNS)
 #define WINDOW_HEIGHT (TILE_SIZE * N_ROWS)
 #define MAX_BODY_LENGTH ((N_COLUMNS * N_ROWS) / 2)
-#define ORIG_MOVE_DURATION 15
-#define MIN_MOVE_DURATION 5
+#define ORIG_MOVE_DURATION 8
+// #define MIN_MOVE_DURATION 5
+#define SUBPIXELS 4
 
 
 //--------------------------------------------------------Structs
@@ -34,7 +36,9 @@ int moveSnake(Snake* snake);
 
 //---------------------------------------------------------------Static
 
+int gameOver = 0;
 int buffer = 0;
+int score = 0;
 float move_duration = ORIG_MOVE_DURATION;
 Snake snake;
 Point food;
@@ -70,7 +74,7 @@ int snakeContainsPoint(const Snake* snake, Point point) {
 	if(point.x == snake->head.x && point.y == snake->head.y)
 		return 1;
 	for(int i = 0; i < snake->bodyLength; i++) {
-		if(point.x == snake->body[i].x && point.y == snake->body[i].y)
+		if(point.x == snake->body[i].x && point.y == snake->body[i].y)		
 			return 1;
 	}
 	return 0;
@@ -102,15 +106,18 @@ int moveSnake(Snake* snake) {
 
 	if(next.x < 0 || next.x >= N_COLUMNS ||
 	   next.y < 0 || next.y >= N_ROWS ||
-	   snakeContainsPoint(snake, next))
+	   snakeContainsPoint(snake, next)) {
+		gameOver = 1;
 		return 0;
+	}
 
 	if(next.x == food.x && next.y == food.y) {
 		moveFood(snake);
-		if(ORIG_MOVE_DURATION > MIN_MOVE_DURATION)
-			move_duration -= 0.4;
+		/* if(ORIG_MOVE_DURATION > MIN_MOVE_DURATION) */
+		/* 	move_duration -= 0.4; */
 		if(snake->bodyLength < MAX_BODY_LENGTH)
 			snake->bodyLength++;
+		score++;
 	}	
 
 	for(int i = snake->bodyLength - 1; i > 0; i--)
@@ -124,6 +131,16 @@ int moveSnake(Snake* snake) {
 
 //---------------------------------------------------------------Core Functions
 
+void resetGame(void) {
+	
+	move_duration = ORIG_MOVE_DURATION;
+	snake = makeSnake();
+	moveFood(&snake);
+	score = 0;
+	gameOver = 0;
+	buffer = 0;
+}
+
 void render(void) {
 
 	for (int x = 0; x < N_COLUMNS; x++) {
@@ -134,6 +151,15 @@ void render(void) {
 				0.3 + (x + y) % 2 * 0.1,
 				0.5
 			);
+	}
+
+	if(gameOver && buffer % 8 == 0) {
+		if(snake.bodyLength > 0)
+			snake.bodyLength--;
+		else {
+			fprintf(stdout, "Score: %d\n", score);
+			resetGame();
+		}
 	}
 	
 	drawSquare(snake.head, 0.9, 0.6, 0.3);
@@ -150,13 +176,6 @@ void update(void) {
 	moveSnake(&snake);
 } 
 
-void resetGame(void) {
-	
-	move_duration = ORIG_MOVE_DURATION;
-	snake = makeSnake();
-	moveFood(&snake);
-}
-
 void on_key(S2D_Event e) {
 
 	if(e.type != S2D_KEY_DOWN || strlen(e.key) > 1)
@@ -166,22 +185,22 @@ void on_key(S2D_Event e) {
 	case 'W':
 		if(snake.dir.y)
 			return;
-		snake.dir = (Point){0, -1};
+		snake.dir = (Point) {0, -1};
 		break;
 	case 'S':
 		if(snake.dir.y)
 			return;
-		snake.dir = (Point){0, 1};
+		snake.dir = (Point) {0, 1};
 		break;
 	case 'A':
 		if(snake.dir.x)
 			return;
-		snake.dir = (Point){-1, 0};
+		snake.dir = (Point) {-1, 0};
 		break;
 	case 'D':
 		if(snake.dir.x)
 			return;
-		snake.dir = (Point){1, 0};
+		snake.dir = (Point) {1, 0};
 		break;
 	case 'R':
 		resetGame();
